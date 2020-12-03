@@ -16,7 +16,7 @@ class Draw_boxes:
         return item, part
 
 
-    def draw_item_part(self, part_draw=True):
+    def draw_item_part(self, part_draw=False):
         item, part = self.get_list()
 
         result = self.img

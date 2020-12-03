@@ -13,7 +13,7 @@ def read_img(img_item):
         encodestr = str(base64.b64encode(data),'utf-8')
     #请求头
     # 请修改为你自己的appcode，可从云市场订单或者api网关处获得
-    AppCode = "95a0a8e0a278412cb465c37ce8ca2b6f"
+    AppCode = ""
     headers = {
         'Authorization': 'APPCODE ' + AppCode,
         'Content-Type': 'application/json; charset=UTF-8'

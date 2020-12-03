@@ -1,4 +1,5 @@
 from gt_visual import get_sorted_dict
+from gt_visual import draw_2 as draw
 from draw_boxes import Draw_boxes
 import os
 from resolve import Resolve
@@ -56,7 +57,16 @@ def IOU(Xmlframe, Jsonframe):
         Area2 = width2 * height2;
         ratio = Area * 1. / (Area1 + Area2 - Area)
     # return IOU
-    return ratio
+
+    if width <= 0 or height <= 0:
+        ratio_h = 0  # 重叠率为 0
+    else:
+        Area_h =  height;  # 两矩形相交面积
+        Area1_h =  height1;
+        Area2_h =  height2;
+        ratio_h = Area_h * 1. / (Area2_h)
+
+    return ratio_h
 
 def meanIouandF1measure(imgName):
     xmlName = imgName.split(".png")[0]+'.xml'
@@ -105,7 +115,7 @@ def meanIouandF1measure(imgName):
     res_presion = np.array(precision).mean()
     #print(res_presion)
 
-    return np.array(res_IOU).mean(), np.array(res_F1Measure).mean()
+    return np.array(res_IOU).mean(), np.array(res_F1Measure).mean(), res_IOU, res_F1Measure
 
 
 def F1Measure(Xmlframe, Jsonframe):
@@ -149,8 +159,20 @@ def F1Measure(Xmlframe, Jsonframe):
         recall = Recall(TP, FN);
         precision = Precision(TP, FP);
         f1_Measure = Measure(precision, recall);
+
+    if width <= 0 or height <= 0:
+        ratio = 0  # 重叠率为 0
+        f1_Measure_h = 0; #TP = 0
+
+    else:
+        TP_h =  height;  # 两矩形相交面积
+        FN_h =  height1 - TP_h;
+        FP_h =  height2 - TP_h;
+        recall_h = Recall(TP_h, FN_h);
+        precision_h = Precision(TP_h, FP_h);
+        f1_Measure_h = Measure(precision_h, recall_h);
     # return f1_Measure
-    return f1_Measure
+    return f1_Measure_h
 
 
 
@@ -169,21 +191,35 @@ def Measure(precision, recall):
     return f1measure
 
 
+def test_for_one(filename):
+
+    img = cv2.imread('./train/imgs/' + filename + ".png")
+    file_path = './train/json/' + filename + ".json"
+    xml_path = './train/page/' + filename + '.xml'
+
+    print(os.path.isfile(file_path))
+    print(os.path.isfile(xml_path))
+    print(img.shape)
+    draw_box = Draw_boxes(img, file_path)
+    result_img = draw_box.draw_item_part()
+    iou, f1, iou_list, f1_list = meanIouandF1measure(filename)
+    region, _, _ = get_sorted_dict(xml_path)
+    draw(region, result_img, iou_list)
+
+    cv2.imwrite('compare.png', result_img)
 
 if __name__ == '__main__':
     i = 1
     iou_all = 0
     f1_all = 0
     for filename in os.listdir('./train/imgs'):
-        #print(filename)
+        print(filename)
         print("第 {} 张图片数据：".format(i))
-        iou, f1 = meanIouandF1measure(filename)
+        iou, f1, iou_list, f1_list = meanIouandF1measure(filename)
         iou_all += iou
         f1_all += f1
         i += 1
 
-    print(iou_all)
-    print(f1_all)
     mean_iou_all = iou_all / i
     mean_f1_all = f1_all / i
 
@@ -191,3 +227,6 @@ if __name__ == '__main__':
     print(mean_f1_all)
     # print("ok");
     #meanIouandF1measure("0533_001.pdf_3.png")
+
+    filename = "0533_001.pdf_5"
+    #test_for_one(filename)
