@@ -1,0 +1,4 @@
+*.jpg
+*.xml
+*.txt
+__pycache__/
