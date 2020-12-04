@@ -1,21 +1,16 @@
 from gt_visual import get_sorted_dict
 from gt_visual import draw_2 as draw
-from draw_boxes import Draw_boxes
+
 import os
-from resolve import Resolve
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-xml_path = './train/page/page'
-json_path = './train/json'
-img_path = './train/imgs'
+from box_refine import Post_Process
 
-def getJsonRect(json_f):
-    resovle_value = Resolve(json_f)
-    item = resovle_value.resolve_item()
-    part = resovle_value.resolve_part()
-    return item, part
-
+xml_path = '../ali_json/train/page/page'
+json_path = '../train/json'
+img_path = '../ali_json/train/imgs'
+#img_path = '../ali_json/train/test'
 
 def IOU(Xmlframe, Jsonframe):
     """
@@ -34,12 +29,12 @@ def IOU(Xmlframe, Jsonframe):
             #Xmlframe[2][1] - Xmlframe[0][1];
 
 
-    Jsonframe = Jsonframe[0];
-    x2 = min(Jsonframe[0]['x'],Jsonframe[3]['x']) #可能识别出来是4边形，往大的算成一个矩形
-    y2 = min(Jsonframe[0]['y'],Jsonframe[1]['y'])
 
-    width2 = max(Jsonframe[2]['x'] - Jsonframe[0]['x'],Jsonframe[1]['x'] - Jsonframe[3]['x']) #对角线相减
-    height2 = max(Jsonframe[2]['y'] - Jsonframe[0]['y'],Jsonframe[3]['y'] - Jsonframe[1]['y'])
+    x2 = Jsonframe[0][0]
+    y2 = Jsonframe[0][1]
+
+    width2 = Jsonframe[1][0] - Jsonframe[0][0]
+    height2 = Jsonframe[1][1] - Jsonframe[0][1]
 
     endx = max(x1 + width1, x2 + width2);
     startx = min(x1, x2);
@@ -68,7 +63,9 @@ def IOU(Xmlframe, Jsonframe):
 
     return ratio
 
-def meanIouandF1measure(imgName):
+def meanIouandF1measure(imgName, template_path):
+
+    image = cv2.imread('../ali_json/train/imgs/' + imgName)
     xmlName = imgName.split(".png")[0]+'.xml'
     jsonName = imgName.split(".png")[0]+'.json'
     xmlNamePath = os.path.join(xml_path,xmlName)
@@ -76,9 +73,13 @@ def meanIouandF1measure(imgName):
     jsonNamePath = os.path.join(json_path,jsonName);
 
     xml_region, baseline, boxes = get_sorted_dict(xmlNamePath)
-    json_region,part = getJsonRect(jsonNamePath)
+    #json_region,part = getJsonRect(jsonNamePath)
+    image_f_path = img_path + '/' + imgName
+    image_f = cv2.imread(image_f_path)
+    post_process = Post_Process(image_f, image_f_path, template_path)
+    json_region = post_process.refine_box()
 
-
+    draw(xml_region, image)
     res_IOU = []
     res_F1Measure = []
 
@@ -87,11 +88,13 @@ def meanIouandF1measure(imgName):
         f1_Measure = 0
         for j in range(len(xml_region)):
             iou = max(iou, IOU(xml_region[j], json_region[i]))
+            image = draw_with_text(image, json_region[i], iou)
             f1_Measure = max(f1_Measure, F1Measure(xml_region[j], json_region[i]))
         res_F1Measure.append(f1_Measure)
         res_IOU.append(iou)
     print(res_IOU)
     print("  IOU平均: " + str(np.array(res_IOU).mean()))
+    cv2.imwrite('./compare/' + imgName, image)
     print(res_F1Measure)
     print("  F1平均: " + str(np.array(res_F1Measure).mean()))
 
@@ -133,12 +136,11 @@ def F1Measure(Xmlframe, Jsonframe):
     height1 = Xmlframe[3][1] - Xmlframe[1][1];
     # Xmlframe[2][1] - Xmlframe[0][1];
 
-    Jsonframe = Jsonframe[0];
-    x2 = min(Jsonframe[0]['x'], Jsonframe[3]['x'])  # 可能识别出来是4边形，往大的算成一个矩形
-    y2 = min(Jsonframe[0]['y'], Jsonframe[1]['y'])
+    x2 = Jsonframe[0][0]
+    y2 = Jsonframe[0][1]
 
-    width2 = max(Jsonframe[2]['x'] - Jsonframe[0]['x'], Jsonframe[1]['x'] - Jsonframe[3]['x'])  # 对角线相减
-    height2 = max(Jsonframe[2]['y'] - Jsonframe[0]['y'], Jsonframe[3]['y'] - Jsonframe[1]['y'])
+    width2 = Jsonframe[1][0] - Jsonframe[0][0]
+    height2 = Jsonframe[1][1] - Jsonframe[0][1]
 
     endx = max(x1 + width1, x2 + width2);
     startx = min(x1, x2);
@@ -190,32 +192,23 @@ def Measure(precision, recall):
     f1measure = 2.*precision*recall / (precision + recall)
     return f1measure
 
+def draw_with_text(img, coord, value):
 
-def test_for_one(filename):
+    cv2.rectangle(img, coord[0], coord[1], (0,0,255), 2)
+    cv2.putText(img, str(value), coord[0], cv2.FONT_HERSHEY_PLAIN, 1.5, (0, 0, 255), 1)
 
-    img = cv2.imread('./train/imgs/' + filename + ".png")
-    file_path = './train/json/' + filename + ".json"
-    xml_path = './train/page/' + filename + '.xml'
+    return img
 
-    print(os.path.isfile(file_path))
-    print(os.path.isfile(xml_path))
-    print(img.shape)
-    draw_box = Draw_boxes(img, file_path)
-    result_img = draw_box.draw_item_part()
-    iou, f1, iou_list, f1_list = meanIouandF1measure(filename)
-    region, _, _ = get_sorted_dict(xml_path)
-    draw(region, result_img, iou_list)
-
-    cv2.imwrite('compare.png', result_img)
 
 if __name__ == '__main__':
     i = 1
     iou_all = 0
     f1_all = 0
-    for filename in os.listdir('./train/imgs'):
+    template_path = './numbers/'
+    for filename in os.listdir(img_path):
         print(filename)
         print("第 {} 张图片数据：".format(i))
-        iou, f1, iou_list, f1_list = meanIouandF1measure(filename)
+        iou, f1, iou_list, f1_list = meanIouandF1measure(filename, template_path)
         iou_all += iou
         f1_all += f1
         i += 1

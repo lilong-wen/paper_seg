@@ -43,7 +43,7 @@ class NumDetection:
             res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
             loc = np.where(res >= threshold)
             for pt in zip(*loc[::-1]):
-                cv2.rectangle(image, pt, (pt[0] + w, pt[1] + h), (7,249,151), 2)
+                #cv2.rectangle(image, pt, (pt[0] + w, pt[1] + h), (7,249,151), 2)
                 loc_list.append(pt)
 
         loc_list = self.remove_repetition_locs(loc_list)
